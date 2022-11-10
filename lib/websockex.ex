@@ -1078,6 +1078,7 @@ defmodule WebSockex do
   end
 
   defp do_terminate(reason, _parent, _debug, %{module: mod, module_state: mod_state}) do
+    require Logger
     mod.terminate(reason, mod_state)
 
     case reason do
@@ -1087,8 +1088,13 @@ defmodule WebSockex do
       {_, 1000, _} ->
         exit(:normal)
 
-      _ ->
+      reason when Kernel.is_exception(reason) ->
+        Logger.error(Exception.message(reason))
+
         exit(reason)
+
+      reason ->
+        Logger.error("Websockex terminated due to unknown error", reason)
     end
   end
 
@@ -1127,12 +1133,19 @@ defmodule WebSockex do
 
   defp try_callback(module, function, args) do
     apply(module, function, args)
-  catch
-    :error, payload ->
-      stacktrace = System.stacktrace()
-      reason = Exception.normalize(:error, payload, stacktrace)
-      {:"$EXIT", {reason, stacktrace}}
+  rescue
+    error ->
+      stacktrace = __STACKTRACE__
+      reason = Exception.normalize(:error, error, stacktrace)
 
+      {:"$EXIT",
+       %Websockex.CallbackError{
+         reason: reason,
+         stacktrace: stacktrace,
+         function: function,
+         args: args
+       }}
+  catch
     :exit, payload ->
       {:"$EXIT", payload}
   end
