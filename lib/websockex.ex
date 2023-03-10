@@ -615,6 +615,9 @@ defmodule WebSockex do
         Process.demonitor(ref, [:flush])
         new_state = Map.delete(state, :task)
         {:error, reason, new_state}
+    after
+      60_000 ->
+        terminate("Nothing received in 60 seconds", parent, debug, state)
     end
   end
 
@@ -659,6 +662,9 @@ defmodule WebSockex do
           msg ->
             debug = Utils.sys_debug(debug, {:in, :msg, msg}, state)
             common_handle({:handle_info, msg}, parent, debug, state)
+        after
+          60_000 ->
+            terminate("Nothing received in 60 seconds", parent, debug, state)
         end
     end
   end
@@ -693,6 +699,9 @@ defmodule WebSockex do
         new_conn = WebSockex.Conn.close_socket(conn)
         debug = Utils.sys_debug(debug, :timeout_closed, state)
         on_disconnect(reason, parent, debug, %{state | conn: new_conn})
+    after
+      60_000 ->
+        terminate("Nothing received in 60 seconds", parent, debug, state)
     end
   end
 
